@@ -40,14 +40,14 @@
             <form id="login-form" class="space-y-4">
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1">E-mail de Acesso</label>
-                    <input type="email" id="login-email" required placeholder="operador@luteron.com.br" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-luter-gold text-sm">
+                    <input type="email" id="login-email" required value="luteronoficial@gmail.com" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-luter-gold text-sm">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1">Senha</label>
                     <input type="password" id="login-password" required placeholder="••••••••" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-luter-gold text-sm">
                 </div>
                 <div id="login-error" class="hidden text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200"></div>
-                <button type="submit" class="w-full bg-luter-green hover:bg-luter-greenDark text-white font-semibold py-3 rounded-lg transition shadow-md text-sm tracking-wide">ACESSAR SISTEMA</button>
+                <button type="submit" id="btn-entrar" class="w-full bg-luter-green hover:bg-luter-greenDark text-white font-semibold py-3 rounded-lg transition shadow-md text-sm tracking-wide">ACESSAR SISTEMA</button>
             </form>
         </div>
     </div>
@@ -248,7 +248,6 @@
     </div>
 
     <!-- MODAIS -->
-    <!-- Modal Empresa com campo WhatsApp Autorizado -->
     <div id="modal-empresa" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
             <h3 class="text-base font-bold text-luter-green">Nova Empresa Cliente</h3>
@@ -278,7 +277,6 @@
         </div>
     </div>
 
-    <!-- Modal Lançamento -->
     <div id="modal-lancamento" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
             <h3 id="titulo-modal-lancamento" class="text-base font-bold text-luter-green">Lançamento</h3>
@@ -295,7 +293,6 @@
         </div>
     </div>
 
-    <!-- Modal Parceiro CRM -->
     <div id="modal-parceiro" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
             <h3 class="text-base font-bold text-luter-green">Novo Parceiro</h3>
@@ -308,7 +305,7 @@
     </div>
 
     <script>
-        const SUPABASE_URL = 'https://slljoxvhnhfbeabliwok.supabase.co';[cite: 3]
+        const SUPABASE_URL = 'https://slljoxvhnhfbeabliwok.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_2ZlZeX14nV38XNSiEoQ3hQ_tYLLaDJD';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -322,20 +319,34 @@
             if (session) iniciarSistema(session.user);
         });
 
+        // Evento de Login corrigido para prevenir recarregamento e capturar erros
         document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
+            e.preventDefault(); // Impede o recarregamento padrão da página
+            const email = document.getElementById('login-email').value.trim();
             const password = document.getElementById('login-password').value;
+            const errorDiv = document.getElementById('login-error');
+            const btnEntrar = document.getElementById('btn-entrar');
+
+            errorDiv.classList.add('hidden');
+            btnEntrar.textContent = 'Autenticando...';
+            btnEntrar.disabled = true;
+
             const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            
             if (error) {
-                document.getElementById('login-error').textContent = 'Erro ao entrar. Verifique credenciais.';
-                document.getElementById('login-error').classList.remove('hidden');
-            } else {
-                iniciarSistema(data.user);
+                errorDiv.textContent = 'Erro ao entrar: ' + error.message;
+                errorDiv.classList.remove('hidden');
+                btnEntrar.textContent = 'ACESSAR SISTEMA';
+                btnEntrav.disabled = false;
+            } else if (data.session) {
+                iniciarSistema(data.session.user);
             }
         });
 
-        async function fazerLogout() { await supabaseClient.auth.signOut(); location.reload(); }
+        async function fazerLogout() { 
+            await supabaseClient.auth.signOut(); 
+            location.reload(); 
+        }
 
         async function iniciarSistema(user) {
             document.getElementById('login-screen').classList.add('hidden');
@@ -345,10 +356,11 @@
         }
 
         async function carregarEmpresas() {
-            const { data: empresas } = await supabaseClient.from('empresas').select('*').order('nome_fantasia');
+            const { data: empresas, error } = await supabaseClient.from('empresas').select('*').order('nome_fantasia');
             const selector = document.getElementById('empresa-selector');
             selector.innerHTML = '';
-            if (!empresas || empresas.length === 0) {
+            
+            if (error || !empresas || empresas.length === 0) {
                 document.getElementById('empty-empresa-alert').classList.remove('hidden');
                 document.getElementById('view-dashboard').classList.add('hidden');
                 return;
@@ -501,7 +513,6 @@
             });
         }
 
-        // Submits
         document.getElementById('form-empresa').addEventListener('submit', async (e) => {
             e.preventDefault();
             await supabaseClient.from('empresas').insert({
