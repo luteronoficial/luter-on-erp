@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LUTER ON | Gestão Empresarial & BPO Financeiro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        luter: {
+                            green: '#3F5038',
+                            greenDark: '#2E3B29',
+                            gold: '#B28A46',
+                            goldLight: '#C9A461',
+                            offwhite: '#F4F1E9',
+                            surface: '#FFFFFF'
+                        }
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-luter-offwhite text-luter-green font-sans antialiased">
+
+    <!-- TELA DE LOGIN -->
+    <div id="login-screen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-xl border border-luter-gold/30 p-8">
+            <div class="text-center mb-8">
+                <div class="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-luter-green text-luter-gold font-bold text-2xl tracking-wider mb-3 shadow-md">LO</div>
+                <h1 class="text-2xl font-bold text-luter-green tracking-tight">LUTER ON</h1>
+                <p class="text-xs uppercase tracking-widest text-luter-gold font-semibold mt-1">Gestão Empresarial & BPO</p>
+            </div>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1">E-mail de Acesso</label>
+                    <input type="email" id="login-email" required placeholder="operador@luteron.com.br" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-luter-gold text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1">Senha</label>
+                    <input type="password" id="login-password" required placeholder="••••••••" class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-luter-gold text-sm">
+                </div>
+                <div id="login-error" class="hidden text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200"></div>
+                <button type="submit" class="w-full bg-luter-green hover:bg-luter-greenDark text-white font-semibold py-3 rounded-lg transition shadow-md text-sm tracking-wide">ACESSAR SISTEMA</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- SISTEMA PRINCIPAL -->
+    <div id="app-screen" class="hidden min-h-screen flex flex-col">
+        <header class="bg-luter-green text-white shadow-md sticky top-0 z-30">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-lg bg-luter-gold/20 border border-luter-gold flex items-center justify-center text-luter-gold font-bold text-sm">LO</div>
+                    <div>
+                        <span class="font-bold tracking-wide text-sm sm:text-base">LUTER ON</span>
+                        <span class="hidden sm:inline-block text-[11px] text-luter-gold ml-2 uppercase tracking-widest">Painel Operacional</span>
+                    </div>
+                </div>
+
+                <!-- SELETOR DE EMPRESA -->
+                <div class="flex-1 max-w-md flex items-center gap-2">
+                    <select id="empresa-selector" onchange="trocarEmpresa()" class="w-full bg-luter-greenDark text-white text-xs sm:text-sm border border-luter-gold/50 rounded-lg px-3 py-2 focus:outline-none">
+                        <option value="">Carregando empresas...</option>
+                    </select>
+                    <button onclick="abrirModalEmpresa()" class="bg-luter-gold hover:bg-luter-goldLight text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap">+ Empresa</button>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <span id="user-badge" class="hidden md:inline-block text-xs text-luter-offwhite/80"></span>
+                    <button onclick="fazerLogout()" class="text-xs text-luter-gold hover:underline font-medium">Sair</button>
+                </div>
+            </div>
+
+            <!-- MENU DE MÓDULOS -->
+            <nav class="bg-luter-greenDark border-t border-white/10">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-6 overflow-x-auto text-xs font-medium">
+                    <button onclick="mudarAba('dashboard')" id="tab-dashboard" class="py-3 border-b-2 border-luter-gold text-luter-gold whitespace-nowrap">Visão Geral & Vencimentos</button>
+                    <button onclick="mudarAba('lancamentos')" id="tab-lancamentos" class="py-3 border-b-2 border-transparent text-white/70 hover:text-white whitespace-nowrap">Contas a Pagar & Receber</button>
+                    <button onclick="mudarAba('crm')" id="tab-crm" class="py-3 border-b-2 border-transparent text-white/70 hover:text-white whitespace-nowrap">CRM & Parceiros</button>
+                    <button onclick="mudarAba('botlogs')" id="tab-botlogs" class="py-3 border-b-2 border-transparent text-white/70 hover:text-white whitespace-nowrap">🤖 Auditoria Bot WhatsApp</button>
+                    <button onclick="mudarAba('equipe')" id="tab-equipe" class="py-3 border-b-2 border-transparent text-white/70 hover:text-white whitespace-nowrap">Equipe & Operadores</button>
+                </div>
+            </nav>
+        </header>
+
+        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            
+            <div id="empty-empresa-alert" class="hidden bg-white rounded-xl p-8 text-center border border-luter-gold/40 shadow-sm my-8">
+                <h2 class="text-lg font-bold text-luter-green mb-2">Nenhuma empresa cliente cadastrada</h2>
+                <p class="text-sm text-gray-600 mb-4">Cadastre sua primeira empresa cliente para iniciar.</p>
+                <button onclick="abrirModalEmpresa()" class="bg-luter-green text-white px-5 py-2.5 rounded-lg text-sm font-semibold">+ Cadastrar Empresa</button>
+            </div>
+
+            <!-- ABA 1: DASHBOARD E VENCIMENTOS (DIA, SEMANA, MÊS) -->
+            <section id="view-dashboard" class="space-y-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <span class="text-xs font-semibold uppercase text-gray-500">Saldo Atual em Caixa</span>
+                        <p id="kpi-saldo" class="text-2xl font-bold text-luter-green mt-1">R$ 0,00</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <span class="text-xs font-semibold uppercase text-gray-500">A Receber (Mês)</span>
+                        <p id="kpi-receber" class="text-2xl font-bold text-emerald-700 mt-1">R$ 0,00</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
+                        <span class="text-xs font-semibold uppercase text-gray-500">A Pagar (Mês)</span>
+                        <p id="kpi-pagar" class="text-2xl font-bold text-amber-700 mt-1">R$ 0,00</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-luter-gold/50 shadow-sm">
+                        <span class="text-xs font-semibold uppercase text-luter-gold">Resultado Previsto</span>
+                        <p id="kpi-projetado" class="text-2xl font-bold text-luter-green mt-1">R$ 0,00</p>
+                    </div>
+                </div>
+
+                <!-- AGENDA DE VENCIMENTOS (SEPARADO POR DIA, SEMANA, MÊS) -->
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-3">
+                        <div>
+                            <h3 class="text-sm font-bold text-luter-green uppercase tracking-wide">Agenda de Vencimentos & Obrigações</h3>
+                            <p class="text-xs text-gray-500">Acompanhamento operacional de contas a pagar e receber</p>
+                        </div>
+                        <div class="flex bg-luter-offwhite p-1 rounded-lg text-xs font-semibold">
+                            <button onclick="mudarFiltroAgenda('hoje')" id="btn-agenda-hoje" class="px-3 py-1.5 rounded-md bg-white text-luter-green shadow-sm">Hoje</button>
+                            <button onclick="mudarFiltroAgenda('semana')" id="btn-agenda-semana" class="px-3 py-1.5 rounded-md text-gray-600 hover:text-luter-green">Esta Semana</button>
+                            <button onclick="mudarFiltroAgenda('mes')" id="btn-agenda-mes" class="px-3 py-1.5 rounded-md text-gray-600 hover:text-luter-green">Este Mês</button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-luter-offwhite text-gray-600 uppercase">
+                                <tr>
+                                    <th class="px-4 py-3">Vencimento</th>
+                                    <th class="px-4 py-3">Tipo</th>
+                                    <th class="px-4 py-3">Descrição / Obrigação</th>
+                                    <th class="px-4 py-3">Valor</th>
+                                    <th class="px-4 py-3 text-right">Ação Operacional</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabela-agenda" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ABA 2: CONTAS A PAGAR & RECEBER -->
+            <section id="view-lancamentos" class="hidden space-y-4">
+                <div class="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200">
+                    <div class="flex gap-2">
+                        <select id="filtro-tipo" onchange="carregarLancamentos()" class="text-xs border rounded-lg px-3 py-2">
+                            <option value="todos">Todos os Tipos</option>
+                            <option value="receber">A Receber</option>
+                            <option value="pagar">A Pagar</option>
+                        </select>
+                        <select id="filtro-status" onchange="carregarLancamentos()" class="text-xs border rounded-lg px-3 py-2">
+                            <option value="aberto">Em Aberto</option>
+                            <option value="pago">Quitados / Recebidos</option>
+                            <option value="todos">Todos</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="abrirModalLancamento('receber')" class="bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-semibold">+ Receber</button>
+                        <button onclick="abrirModalLancamento('pagar')" class="bg-luter-green text-white px-3 py-2 rounded-lg text-xs font-semibold">- Pagar</button>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-luter-offwhite text-gray-700 uppercase">
+                            <tr>
+                                <th class="px-4 py-3">Vencimento</th>
+                                <th class="px-4 py-3">Tipo</th>
+                                <th class="px-4 py-3">Descrição</th>
+                                <th class="px-4 py-3">Valor</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3 text-right">Baixa</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-lancamentos" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ABA 3: CRM -->
+            <section id="view-crm" class="hidden space-y-4">
+                <div class="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200">
+                    <h2 class="text-sm font-bold text-luter-green">CRM & Parceiros</h2>
+                    <button onclick="abrirModalParceiro()" class="bg-luter-green text-white px-4 py-2 rounded-lg text-xs font-semibold">+ Novo Parceiro</button>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-luter-offwhite text-gray-700 uppercase">
+                            <tr>
+                                <th class="px-4 py-3">Nome / Razão</th>
+                                <th class="px-4 py-3">Tipo</th>
+                                <th class="px-4 py-3">CNPJ/CPF</th>
+                                <th class="px-4 py-3">WhatsApp</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-crm" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ABA 4: AUDITORIA BOT WHATSAPP -->
+            <section id="view-botlogs" class="hidden space-y-4">
+                <div class="bg-white p-4 rounded-xl border border-gray-200 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-sm font-bold text-luter-green">Histórico de Mensagens do Bot WhatsApp</h2>
+                        <p class="text-xs text-gray-500">Acompanhe os lançamentos efetuados via inteligência artificial e confirmações numéricas.</p>
+                    </div>
+                    <button onclick="carregarLogsBot()" class="bg-luter-offwhite text-luter-green border border-luter-gold px-3 py-1.5 rounded-lg text-xs font-semibold">Atualizar Logs</button>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-luter-offwhite text-gray-700 uppercase">
+                            <tr>
+                                <th class="px-4 py-3">Data/Hora</th>
+                                <th class="px-4 py-3">Telefone Origem</th>
+                                <th class="px-4 py-3">Mensagem Enviada pelo Cliente</th>
+                                <th class="px-4 py-3">Detalhes Extraídos</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-botlogs" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ABA 5: GESTÃO DE OPERADORES (EQUIPE) -->
+            <section id="view-equipe" class="hidden space-y-4">
+                <div class="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200">
+                    <div>
+                        <h2 class="text-sm font-bold text-luter-green">Controle de Operadores e Acessos</h2>
+                        <p class="text-xs text-gray-500">Cadastre e vincule operadores para gerenciarem o financeiro das empresas.</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                    <p class="text-xs text-gray-600 mb-2">Para criar um operador, crie o acesso primeiro no painel do Supabase (Authentication > Add User).</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAIS -->
+    <!-- Modal Empresa com campo WhatsApp Autorizado -->
+    <div id="modal-empresa" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
+            <h3 class="text-base font-bold text-luter-green">Nova Empresa Cliente</h3>
+            <form id="form-empresa" class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold mb-1">Nome Fantasia *</label>
+                    <input type="text" id="emp-fantasia" required placeholder="Ex: Loja do João" class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block font-semibold mb-1">Razão Social *</label>
+                    <input type="text" id="emp-razao" required placeholder="João Comércio ME" class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block font-semibold mb-1">CNPJ *</label>
+                    <input type="text" id="emp-cnpj" required placeholder="00.000.000/0001-00" class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block font-semibold mb-1">WhatsApp Autorizado do Bot *</label>
+                    <input type="text" id="emp-whatsapp" required placeholder="5511999999999 (DDI + DDD + Número)" class="w-full border rounded-lg px-3 py-2">
+                    <p class="text-[10px] text-gray-500 mt-0.5">Número que enviará os gastos e ganhos via WhatsApp.</p>
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="fecharModais()" class="px-4 py-2 border rounded-lg">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-luter-green text-white rounded-lg font-semibold">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Lançamento -->
+    <div id="modal-lancamento" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
+            <h3 id="titulo-modal-lancamento" class="text-base font-bold text-luter-green">Lançamento</h3>
+            <form id="form-lancamento" class="space-y-3 text-xs">
+                <input type="hidden" id="lanc-tipo">
+                <input type="text" id="lanc-descricao" required placeholder="Descrição" class="w-full border rounded-lg px-3 py-2">
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="number" step="0.01" id="lanc-valor" required placeholder="Valor R$" class="w-full border rounded-lg px-3 py-2">
+                    <input type="date" id="lanc-vencimento" required class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <select id="lanc-conta" class="w-full border rounded-lg px-3 py-2"><option value="">-- Conta Bancária --</option></select>
+                <div class="flex justify-end gap-2 pt-2"><button type="button" onclick="fecharModais()" class="px-4 py-2 border rounded-lg">Cancelar</button><button type="submit" class="px-4 py-2 bg-luter-green text-white rounded-lg font-semibold">Salvar</button></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Parceiro CRM -->
+    <div id="modal-parceiro" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
+            <h3 class="text-base font-bold text-luter-green">Novo Parceiro</h3>
+            <form id="form-parceiro" class="space-y-3 text-xs">
+                <input type="text" id="parc-nome" required placeholder="Nome / Razão Social" class="w-full border rounded-lg px-3 py-2">
+                <select id="parc-tipo" class="w-full border rounded-lg px-3 py-2"><option value="cliente">Cliente</option><option value="fornecedor">Fornecedor</option></select>
+                <div class="flex justify-end gap-2 pt-2"><button type="button" onclick="fecharModais()" class="px-4 py-2 border rounded-lg">Cancelar</button><button type="submit" class="px-4 py-2 bg-luter-green text-white rounded-lg font-semibold">Salvar</button></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://slljoxvhnhfbeabliwok.supabase.co';[cite: 3]
+        const SUPABASE_ANON_KEY = 'sb_publishable_2ZlZeX14nV38XNSiEoQ3hQ_tYLLaDJD';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let empresaAtualId = null;
+        let filtroAgendaAtual = 'hoje';
+
+        const formatarMoeda = (val) => Number(val || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (session) iniciarSistema(session.user);
+        });
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) {
+                document.getElementById('login-error').textContent = 'Erro ao entrar. Verifique credenciais.';
+                document.getElementById('login-error').classList.remove('hidden');
+            } else {
+                iniciarSistema(data.user);
+            }
+        });
+
+        async function fazerLogout() { await supabaseClient.auth.signOut(); location.reload(); }
+
+        async function iniciarSistema(user) {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('app-screen').classList.remove('hidden');
+            document.getElementById('user-badge').textContent = user.email;
+            await carregarEmpresas();
+        }
+
+        async function carregarEmpresas() {
+            const { data: empresas } = await supabaseClient.from('empresas').select('*').order('nome_fantasia');
+            const selector = document.getElementById('empresa-selector');
+            selector.innerHTML = '';
+            if (!empresas || empresas.length === 0) {
+                document.getElementById('empty-empresa-alert').classList.remove('hidden');
+                document.getElementById('view-dashboard').classList.add('hidden');
+                return;
+            }
+            document.getElementById('empty-empresa-alert').classList.add('hidden');
+            document.getElementById('view-dashboard').classList.remove('hidden');
+            empresas.forEach(emp => {
+                selector.innerHTML += `<option value="${emp.id}">${emp.nome_fantasia} (${emp.cnpj})</option>`;
+            });
+            empresaAtualId = empresas[0].id;
+            atualizarDadosEmpresa();
+        }
+
+        function trocarEmpresa() {
+            empresaAtualId = document.getElementById('empresa-selector').value;
+            atualizarDadosEmpresa();
+        }
+
+        async function atualizarDadosEmpresa() {
+            if (!empresaAtualId) return;
+            await Promise.all([carregarDashboardEAgenda(), carregarLancamentos(), carregarCRM(), carregarLogsBot()]);
+        }
+
+        async function carregarDashboardEAgenda() {
+            const { data: contas } = await supabaseClient.from('contas_correntes').select('*').eq('empresa_id', empresaAtualId);
+            const { data: lancamentos } = await supabaseClient.from('lancamentos_financeiros').select('*').eq('empresa_id', empresaAtualId);
+
+            let saldoTotal = (contas || []).reduce((acc, c) => acc + Number(c.saldo_atual), 0);
+            let totalReceber = 0, totalPagar = 0;
+
+            (lancamentos || []).forEach(l => {
+                if (l.status === 'aberto') {
+                    if (l.tipo === 'receber') totalReceber += Number(l.valor_previsto);
+                    if (l.tipo === 'pagar') totalPagar += Number(l.valor_previsto);
+                }
+            });
+
+            document.getElementById('kpi-saldo').textContent = formatarMoeda(saldoTotal);
+            document.getElementById('kpi-receber').textContent = formatarMoeda(totalReceber);
+            document.getElementById('kpi-pagar').textContent = formatarMoeda(totalPagar);
+            document.getElementById('kpi-projetado').textContent = formatarMoeda(saldoTotal + totalReceber - totalPagar);
+
+            const selectConta = document.getElementById('lanc-conta');
+            selectConta.innerHTML = '<option value="">-- Conta Bancária --</option>';
+            (contas || []).forEach(c => selectConta.innerHTML += `<option value="${c.id}">${c.nome_conta}</option>`);
+
+            renderizarAgenda(lancamentos || []);
+        }
+
+        function mudarFiltroAgenda(filtro) {
+            filtroAgendaAtual = filtro;
+            ['hoje', 'semana', 'mes'].forEach(f => {
+                const btn = document.getElementById(`btn-agenda-${f}`);
+                btn.className = (f === filtro) ? "px-3 py-1.5 rounded-md bg-white text-luter-green shadow-sm" : "px-3 py-1.5 rounded-md text-gray-600 hover:text-luter-green";
+            });
+            atualizarDadosEmpresa();
+        }
+
+        function renderizarAgenda(lancamentos) {
+            const tbody = document.getElementById('tabela-agenda');
+            const hoje = new Date();
+            hoje.setHours(0,0,0,0);
+
+            const filtrados = lancamentos.filter(l => {
+                if (l.status !== 'aberto') return false;
+                const venc = new Date(l.data_vencimento + 'T00:00:00');
+                if (filtroAgendaAtual === 'hoje') return venc.toDateString() === hoje.toDateString();
+                if (filtroAgendaAtual === 'semana') {
+                    const diffDays = Math.ceil((venc - hoje) / (1000 * 60 * 60 * 24));
+                    return diffDays >= 0 && diffDays <= 7;
+                }
+                if (filtroAgendaAtual === 'mes') return venc.getMonth() === hoje.getMonth() && venc.getFullYear() === hoje.getFullYear();
+                return true;
+            });
+
+            tbody.innerHTML = filtrados.length ? '' : '<tr><td colspan="5" class="px-4 py-6 text-center text-gray-400">Nenhuma obrigação neste período.</td></tr>';
+            filtrados.sort((a,b) => a.data_vencimento.localeCompare(b.data_vencimento)).forEach(l => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="px-4 py-3 font-semibold">${l.data_vencimento.split('-').reverse().join('/')}</td>
+                        <td class="px-4 py-3 uppercase font-bold ${l.tipo === 'receber' ? 'text-emerald-700' : 'text-amber-700'}">${l.tipo}</td>
+                        <td class="px-4 py-3">${l.descricao}</td>
+                        <td class="px-4 py-3 font-bold">${formatarMoeda(l.valor_previsto)}</td>
+                        <td class="px-4 py-3 text-right">
+                            <button onclick="darBaixa('${l.id}', ${l.valor_previsto})" class="bg-luter-green text-white px-2.5 py-1 rounded text-[11px] hover:bg-luter-greenDark">Dar Baixa</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function carregarLancamentos() {
+            const tipo = document.getElementById('filtro-tipo').value;
+            const status = document.getElementById('filtro-status').value;
+            let query = supabaseClient.from('lancamentos_financeiros').select('*').eq('empresa_id', empresaAtualId);
+            if (tipo !== 'todos') query = query.eq('tipo', tipo);
+            if (status !== 'todos') query = query.eq('status', status);
+
+            const { data } = await query;
+            const tbody = document.getElementById('tabela-lancamentos');
+            tbody.innerHTML = (data && data.length) ? '' : '<tr><td colspan="6" class="px-4 py-6 text-center text-gray-400">Nenhum registro.</td></tr>';
+            (data || []).forEach(l => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="px-4 py-3">${l.data_vencimento.split('-').reverse().join('/')}</td>
+                        <td class="px-4 py-3 uppercase font-bold">${l.tipo}</td>
+                        <td class="px-4 py-3">${l.descricao}</td>
+                        <td class="px-4 py-3 font-bold">${formatarMoeda(l.valor_previsto)}</td>
+                        <td class="px-4 py-3 uppercase text-[10px] font-bold">${l.status}</td>
+                        <td class="px-4 py-3 text-right">
+                            ${l.status === 'aberto' ? `<button onclick="darBaixa('${l.id}', ${l.valor_previsto})" class="bg-luter-green text-white px-2 py-1 rounded text-[10px]">Baixar</button>` : '-'}
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        async function darBaixa(id, valor) {
+            if (!confirm('Confirmar baixa deste título?')) return;
+            await supabaseClient.from('lancamentos_financeiros').update({
+                status: 'pago', valor_pago_recebido: valor, data_baixa: new Date().toISOString().split('T')[0]
+            }).eq('id', id);
+            atualizarDadosEmpresa();
+            carregarLancamentos();
+        }
+
+        async function carregarCRM() {
+            const { data } = await supabaseClient.from('parceiros_crm').select('*').eq('empresa_id', empresaAtualId);
+            const tbody = document.getElementById('tabela-crm');
+            tbody.innerHTML = '';
+            (data || []).forEach(p => {
+                tbody.innerHTML += `<tr><td class="px-4 py-3">${p.nome_razao}</td><td class="px-4 py-3 uppercase">${p.tipo_relacao}</td><td class="px-4 py-3">${p.cpf_cnpj || '-'}</td><td class="px-4 py-3">${p.telefone_whatsapp || '-'}</td></tr>`;
+            });
+        }
+
+        async function carregarLogsBot() {
+            const { data } = await supabaseClient.from('bot_logs_lancamentos').select('*').eq('empresa_id', empresaAtualId).order('created_at', { ascending: false });
+            const tbody = document.getElementById('tabela-botlogs');
+            tbody.innerHTML = (data && data.length) ? '' : '<tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">Nenhuma mensagem registrada pelo bot ainda.</td></tr>';
+            (data || []).forEach(log => {
+                const dataFormatada = new Date(log.created_at).toLocaleString('pt-BR');
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="px-4 py-3 text-gray-500">${dataFormatada}</td>
+                        <td class="px-4 py-3 font-mono">${log.telefone_origem}</td>
+                        <td class="px-4 py-3 font-medium">"${log.mensagem_original}"</td>
+                        <td class="px-4 py-3 text-xs font-mono bg-gray-50 rounded">${JSON.stringify(log.json_extraido)}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Submits
+        document.getElementById('form-empresa').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await supabaseClient.from('empresas').insert({
+                nome_fantasia: document.getElementById('emp-fantasia').value,
+                razao_social: document.getElementById('emp-razao').value,
+                cnpj: document.getElementById('emp-cnpj').value,
+                whatsapp_autorizado: document.getElementById('emp-whatsapp').value.replace(/\D/g, '')
+            });
+            fecharModais(); carregarEmpresas();
+        });
+
+        document.getElementById('form-lancamento').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await supabaseClient.from('lancamentos_financeiros').insert({
+                empresa_id: empresaAtualId,
+                tipo: document.getElementById('lanc-tipo').value,
+                descricao: document.getElementById('lanc-descricao').value,
+                valor_previsto: document.getElementById('lanc-valor').value,
+                data_vencimento: document.getElementById('lanc-vencimento').value,
+                conta_corrente_id: document.getElementById('lanc-conta').value || null
+            });
+            fecharModais(); atualizarDadosEmpresa();
+        });
+
+        document.getElementById('form-parceiro').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await supabaseClient.from('parceiros_crm').insert({
+                empresa_id: empresaAtualId,
+                nome_razao: document.getElementById('parc-nome').value,
+                tipo_relacao: document.getElementById('parc-tipo').value
+            });
+            fecharModais(); carregarCRM();
+        });
+
+        function mudarAba(aba) {
+            ['dashboard', 'lancamentos', 'crm', 'botlogs', 'equipe'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden');
+                document.getElementById(`tab-${t}`).className = "py-3 border-b-2 border-transparent text-white/70 hover:text-white whitespace-nowrap";
+            });
+            document.getElementById(`view-${aba}`).classList.remove('hidden');
+            document.getElementById(`tab-${aba}`).className = "py-3 border-b-2 border-luter-gold text-luter-gold whitespace-nowrap";
+            if (aba === 'botlogs') carregarLogsBot();
+        }
+
+        function abrirModalEmpresa() { document.getElementById('modal-empresa').classList.remove('hidden'); }
+        function abrirModalParceiro() { document.getElementById('modal-parceiro').classList.remove('hidden'); }
+        function abrirModalLancamento(tipo) {
+            document.getElementById('lanc-tipo').value = tipo;
+            document.getElementById('titulo-modal-lancamento').textContent = tipo === 'receber' ? 'Nova Conta a Receber' : 'Nova Conta a Pagar';
+            document.getElementById('modal-lancamento').classList.remove('hidden');
+        }
+        function fecharModais() { document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden')); }
+    </script>
+</body>
+</html>
