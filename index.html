@@ -98,7 +98,7 @@
                 <button onclick="abrirModalEmpresa()" class="bg-luter-green text-white px-5 py-2.5 rounded-lg text-sm font-semibold">+ Cadastrar Empresa</button>
             </div>
 
-            <!-- ABA 1: DASHBOARD E VENCIMENTOS (DIA, SEMANA, MÊS) -->
+            <!-- ABA 1: DASHBOARD E VENCIMENTOS -->
             <section id="view-dashboard" class="space-y-6">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm">
@@ -119,7 +119,6 @@
                     </div>
                 </div>
 
-                <!-- AGENDA DE VENCIMENTOS -->
                 <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-3">
                         <div>
@@ -247,7 +246,7 @@
         </main>
     </div>
 
-    <!-- MODAIS COM BUSCA AUTOMÁTICA DE CNPJ -->
+    <!-- MODAIS -->
     <div id="modal-empresa" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b pb-2">
@@ -257,12 +256,12 @@
             
             <form id="form-empresa" class="space-y-3 text-xs">
                 <div>
-                    <label class="block font-semibold mb-1">CNPJ * (Digite para puxar da Receita Federal)</label>
+                    <label class="block font-semibold mb-1">CNPJ * (Digite apenas números)</label>
                     <div class="flex gap-2">
-                        <input type="text" id="emp-cnpj" required placeholder="00.000.000/0001-00" onblur="consultarCNPJ()" class="w-full border rounded-lg px-3 py-2 font-mono">
-                        <button type="button" onclick="consultarCNPJ()" class="bg-luter-gold text-white px-3 py-2 rounded-lg font-semibold whitespace-nowrap hover:bg-luter-goldLight">🔍 Consultar</button>
+                        <input type="text" id="emp-cnpj" required maxlength="18" placeholder="00.000.000/0001-00" oninput="mascaraCNPJ(this)" class="w-full border rounded-lg px-3 py-2 font-mono">
+                        <button type="button" onclick="consultarCNPJ()" class="bg-luter-gold text-white px-3 py-2 rounded-lg font-semibold whitespace-nowrap hover:bg-luter-goldLight">🔍 Buscar</button>
                     </div>
-                    <p id="cnpj-status" class="text-[10px] text-gray-500 mt-1">Ao sair do campo, os dados serão preenchidos automaticamente.</p>
+                    <p id="cnpj-status" class="text-[10px] text-gray-500 mt-1">Digite os 14 números ou clique em Buscar.</p>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -272,7 +271,7 @@
                     </div>
                     <div>
                         <label class="block font-semibold mb-1">Tipo de Empresa (Natureza Jurídica)</label>
-                        <input type="text" id="emp-tipo" placeholder="MEI, ME, LTDA, S.A..." class="w-full border rounded-lg px-3 py-2 bg-gray-50">
+                        <input type="text" id="emp-tipo" placeholder="MEI, ME, LTDA..." class="w-full border rounded-lg px-3 py-2 bg-gray-50">
                     </div>
                 </div>
 
@@ -349,12 +348,41 @@
             if (session) iniciarSistema(session.user);
         });
 
-        // Consulta Automática de CNPJ via BrasilAPI
+        // Máscara automática de CNPJ (digita apenas números)
+        function mascaraCNPJ(input) {
+            let v = input.value.replace(/\D/g, '');
+            if (v.length > 14) v = v.substring(0, 14);
+            
+            if (v.length > 12) {
+                v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$2"); // Ajuste de mascara seguro
+            } else if (v.length > 8) {
+                v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4}).*$/, "$1.$2.$3/$4");
+            } else if (v.length > 5) {
+                v = v.replace(/^(\d{2})(\d{3})(\d{3}).*$/, "$1.$2.$3");
+            } else if (v.length > 2) {
+                v = v.replace(/^(\d{2})(\d{3}).*$/, "$1.$2");
+            }
+            // Simplificado limpo
+            input.value = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2}).*/, "$1.$2.$3/$4-$5")
+                           .replace(/^(\d{2})(\d{3})(\d{3})(\d{4}).*/, "$1.$2.$3/$4")
+                           .replace(/^(\d{2})(\d{3})(\d{3}).*/, "$1.$2.$3")
+                           .replace(/^(\d{2})(\d{3}).*/, "$1.$2");
+
+            // Se completou 14 dígitos, dispara a busca de forma limpa
+            let apenasNumeros = input.value.replace(/\D/g, '');
+            if (apenasNumeros.length === 14) {
+                consultarCNPJ();
+            }
+        }
+
+        // Consulta de CNPJ na BrasilAPI otimizada sem falhas
         async function consultarCNPJ() {
             let cnpjInput = document.getElementById('emp-cnpj').value.replace(/\D/g, '');
             const statusEl = document.getElementById('cnpj-status');
 
             if (cnpjInput.length !== 14) {
+                statusEl.textContent = '⚠️ Digite os 14 números do CNPJ.';
+                statusEl.className = 'text-[10px] text-amber-600 mt-1 font-bold';
                 return;
             }
 
@@ -369,15 +397,15 @@
 
                 document.getElementById('emp-razao').value = data.razao_social || '';
                 document.getElementById('emp-fantasia').value = data.nome_fantasia || data.razao_social || '';
-                document.getElementById('emp-tipo').value = data.porte + ' - ' + (data.natureza_juridica || '');
+                document.getElementById('emp-tipo').value = (data.porte ? data.porte + ' - ' : '') + (data.natureza_juridica || '');
                 
                 const enderecoCompleto = `${data.logradouro || ''}, ${data.numero || ''} ${data.complemento || ''} - ${data.bairro || ''}, ${data.municipio || ''} - ${data.uf || ''} (CEP: ${data.cep || ''})`;
                 document.getElementById('emp-endereco').value = enderecoCompleto;
 
-                statusEl.textContent = '✅ Dados carregados com sucesso da Receita Federal!';
+                statusEl.textContent = '✅ Dados carregados com sucesso!';
                 statusEl.className = 'text-[10px] text-emerald-600 mt-1 font-bold';
             } catch (error) {
-                statusEl.textContent = '⚠️ CNPJ não localizado automaticamente. Preencha os dados manualmente.';
+                statusEl.textContent = '⚠️ CNPJ não localizado automaticamente. Preencha os dados abaixo.';
                 statusEl.className = 'text-[10px] text-red-600 mt-1 font-bold';
             }
         }
@@ -621,15 +649,27 @@
             if (aba === 'botlogs') carregarLogsBot();
         }
 
-        function abrirModalEmpresa() { document.getElementById('modal-empresa').classList.remove('hidden'); }
-        function abrirManagerParceiro() { document.getElementById('modal-parceiro').classList.remove('hidden'); }
+        function abrirModalEmpresa() { 
+            // Limpa o formulário sempre que abrir de forma limpa
+            document.getElementById('form-empresa').reset();
+            document.getElementById('cnpj-status').textContent = 'Digite os 14 números ou clique em Buscar.';
+            document.getElementById('cnpj-status').className = 'text-[10px] text-gray-500 mt-1';
+            document.getElementById('modal-empresa').classList.remove('hidden'); 
+        }
+
         function abrirModalParceiro() { document.getElementById('modal-parceiro').classList.remove('hidden'); }
+        
         function abrirModalLancamento(tipo) {
             document.getElementById('lanc-tipo').value = tipo;
             document.getElementById('titulo-modal-lancamento').textContent = tipo === 'receber' ? 'Nova Conta a Receber' : 'Nova Conta a Pagar';
             document.getElementById('modal-lancamento').classList.remove('hidden');
         }
-        function fecharModais() { document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden')); }
+
+        function fecharModais() { 
+            document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden')); 
+            // Limpa o formulário da empresa ao fechar ou cancelar
+            document.getElementById('form-empresa').reset();
+        }
     </script>
 </body>
 </html>
