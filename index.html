@@ -258,7 +258,7 @@
                 <div>
                     <label class="block font-semibold mb-1">CNPJ * (Digite apenas números)</label>
                     <div class="flex gap-2">
-                        <input type="text" id="emp-cnpj" required maxlength="18" placeholder="00.000.000/0001-00" oninput="mascaraCNPJ(this)" class="w-full border rounded-lg px-3 py-2 font-mono">
+                        <input type="text" id="emp-cnpj" required placeholder="00.000.000/0001-00" oninput="mascaraCNPJ(this)" class="w-full border rounded-lg px-3 py-2 font-mono">
                         <button type="button" onclick="consultarCNPJ()" class="bg-luter-gold text-white px-3 py-2 rounded-lg font-semibold whitespace-nowrap hover:bg-luter-goldLight">🔍 Buscar</button>
                     </div>
                     <p id="cnpj-status" class="text-[10px] text-gray-500 mt-1">Digite os 14 números ou clique em Buscar.</p>
@@ -348,34 +348,30 @@
             if (session) iniciarSistema(session.user);
         });
 
-        // Máscara automática de CNPJ (digita apenas números)
+        // Máscara automática de CNPJ fluida e livre de travas
         function mascaraCNPJ(input) {
             let v = input.value.replace(/\D/g, '');
             if (v.length > 14) v = v.substring(0, 14);
-            
-            if (v.length > 12) {
-                v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$2"); // Ajuste de mascara seguro
-            } else if (v.length > 8) {
-                v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4}).*$/, "$1.$2.$3/$4");
-            } else if (v.length > 5) {
-                v = v.replace(/^(\d{2})(\d{3})(\d{3}).*$/, "$1.$2.$3");
-            } else if (v.length > 2) {
-                v = v.replace(/^(\d{2})(\d{3}).*$/, "$1.$2");
-            }
-            // Simplificado limpo
-            input.value = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2}).*/, "$1.$2.$3/$4-$5")
-                           .replace(/^(\d{2})(\d{3})(\d{3})(\d{4}).*/, "$1.$2.$3/$4")
-                           .replace(/^(\d{2})(\d{3})(\d{3}).*/, "$1.$2.$3")
-                           .replace(/^(\d{2})(\d{3}).*/, "$1.$2");
 
-            // Se completou 14 dígitos, dispara a busca de forma limpa
-            let apenasNumeros = input.value.replace(/\D/g, '');
+            if (v.length > 12) {
+                v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+            } else if (v.length > 8) {
+                v = v.replace(/^(\d{2})(\d{3})(\d{3})(\d{1,4})$/, "$1.$2.$3/$4");
+            } else if (v.length > 5) {
+                v = v.replace(/^(\d{2})(\d{3})(\d{1,3})$/, "$1.$2.$3");
+            } else if (v.length > 2) {
+                v = v.replace(/^(\d{2})(\d{1,3})$/, "$1.$2");
+            }
+
+            input.value = v;
+
+            let apenasNumeros = v.replace(/\D/g, '');
             if (apenasNumeros.length === 14) {
                 consultarCNPJ();
             }
         }
 
-        // Consulta de CNPJ na BrasilAPI otimizada sem falhas
+        // Consulta de CNPJ na BrasilAPI otimizada
         async function consultarCNPJ() {
             let cnpjInput = document.getElementById('emp-cnpj').value.replace(/\D/g, '');
             const statusEl = document.getElementById('cnpj-status');
@@ -650,7 +646,7 @@
         }
 
         function abrirModalEmpresa() { 
-            // Limpa o formulário sempre que abrir de forma limpa
+            // Limpa o formulário garantindo que abra limpo
             document.getElementById('form-empresa').reset();
             document.getElementById('cnpj-status').textContent = 'Digite os 14 números ou clique em Buscar.';
             document.getElementById('cnpj-status').className = 'text-[10px] text-gray-500 mt-1';
@@ -667,7 +663,7 @@
 
         function fecharModais() { 
             document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden')); 
-            // Limpa o formulário da empresa ao fechar ou cancelar
+            // Limpa o formulário ao fechar
             document.getElementById('form-empresa').reset();
         }
     </script>
