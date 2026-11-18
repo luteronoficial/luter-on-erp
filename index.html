@@ -64,12 +64,12 @@
                     </div>
                 </div>
 
-                <!-- SELETOR DE EMPRESA -->
+                <!-- SELETOR DE EMPRESA E BOTÃO DISCRETO -->
                 <div class="flex-1 max-w-md flex items-center gap-2">
                     <select id="empresa-selector" onchange="trocarEmpresa()" class="w-full bg-luter-greenDark text-white text-xs sm:text-sm border border-luter-gold/50 rounded-lg px-3 py-2 focus:outline-none">
-                        <option value="">Carregando empresas...</option>
+                        <option value="">Selecione uma empresa...</option>
                     </select>
-                    <button onclick="abrirModalEmpresa()" class="bg-luter-gold hover:bg-luter-goldLight text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap">+ Empresa</button>
+                    <button onclick="abrirModalEmpresa()" class="bg-luter-gold hover:bg-luter-goldLight text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap shadow-sm">+ Empresa</button>
                 </div>
 
                 <div class="flex items-center gap-3">
@@ -90,13 +90,7 @@
             </nav>
         </header>
 
-        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            
-            <div id="empty-empresa-alert" class="hidden bg-white rounded-xl p-8 text-center border border-luter-gold/40 shadow-sm my-8">
-                <h2 class="text-lg font-bold text-luter-green mb-2">Nenhuma empresa cliente cadastrada</h2>
-                <p class="text-sm text-gray-600 mb-4">Cadastre sua primeira empresa cliente para iniciar.</p>
-                <button onclick="abrirModalEmpresa()" class="bg-luter-green text-white px-5 py-2.5 rounded-lg text-sm font-semibold">+ Cadastrar Empresa</button>
-            </div>
+        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
             <!-- ABA 1: DASHBOARD E VENCIMENTOS -->
             <section id="view-dashboard" class="space-y-6">
@@ -386,8 +380,6 @@
             statusEl.className = 'text-[10px] text-amber-600 mt-1 font-bold';
 
             let dados = null;
-
-            // Tentativa nas bases públicas em cascata
             const urls = [
                 `https://brasilapi.com.br/api/cnpj/v1/${cnpjInput}`,
                 `https://open.cnpja.com.br/office/${cnpjInput}`,
@@ -399,7 +391,6 @@
                     const res = await fetch(url);
                     if (res.ok) {
                         const json = await res.json();
-                        
                         if (url.includes('brasilapi')) {
                             dados = {
                                 razao_social: json.razao_social,
@@ -449,24 +440,20 @@
                             break;
                         }
                     }
-                } catch (e) {
-                    // Continua tentado a próxima
-                }
+                } catch (e) {}
             }
 
             if (dados) {
                 document.getElementById('emp-razao').value = dados.razao_social || '';
                 document.getElementById('emp-fantasia').value = dados.nome_fantasia || dados.razao_social || '';
                 document.getElementById('emp-tipo').value = (dados.porte ? dados.porte + ' - ' : '') + (dados.natureza_juridica || '');
-                
                 const enderecoCompleto = `${dados.logradouro || ''}, ${dados.numero || ''} ${dados.complemento || ''} - ${dados.bairro || ''}, ${dados.municipio || ''} - ${dados.uf || ''} (CEP: ${dados.cep || ''})`;
                 document.getElementById('emp-endereco').value = enderecoCompleto;
 
                 statusEl.textContent = '✅ Dados carregados com sucesso!';
                 statusEl.className = 'text-[10px] text-emerald-600 mt-1 font-bold';
             } else {
-                // Caso a API pública não tenha o registro, avisa de forma limpa e destrava o preenchimento manual
-                statusEl.textContent = 'ℹ️ CNPJ não localizado nas bases públicas. Preencha os campos abaixo manualmente.';
+                statusEl.textContent = 'ℹ️ CNPJ não localizado automaticamente. Preencha os campos abaixo.';
                 statusEl.className = 'text-[10px] text-amber-600 mt-1 font-bold';
                 document.getElementById('emp-fantasia').focus();
             }
@@ -507,28 +494,44 @@
             await carregarEmpresas();
         }
 
-        async function carregarEmpresas() {
+        async function carregarEmpresas(selecionarRecenteId = null) {
             const { data: empresas, error } = await supabaseClient.from('empresas').select('*').order('nome_fantasia');
             const selector = document.getElementById('empresa-selector');
             selector.innerHTML = '';
             
             if (error || !empresas || empresas.length === 0) {
-                document.getElementById('empty-empresa-alert').classList.remove('hidden');
-                document.getElementById('view-dashboard').classList.add('hidden');
+                selector.innerHTML = '<option value="">Nenhuma empresa cadastrada</option>';
+                empresaAtualId = null;
+                limparDadosTela();
                 return;
             }
-            document.getElementById('empty-empresa-alert').classList.add('hidden');
-            document.getElementById('view-dashboard').classList.remove('hidden');
+
             empresas.forEach(emp => {
                 selector.innerHTML += `<option value="${emp.id}">${emp.nome_fantasia} (${emp.cnpj})</option>`;
             });
-            empresaAtualId = empresas[0].id;
+
+            // Se foi passado um ID recente (pós-cadastro), seleciona ele. Senão, mantém o atual ou o primeiro.
+            if (selecionarRecenteId && empresas.some(e => e.id === selecionarRecenteId)) {
+                empresaAtualId = selecionarRecenteId;
+            } else if (!empresaAtualId || !empresas.some(e => e.id === empresaAtualId)) {
+                empresaAtualId = empresas[0].id;
+            }
+
+            selector.value = empresaAtualId;
             atualizarDadosEmpresa();
         }
 
         function trocarEmpresa() {
             empresaAtualId = document.getElementById('empresa-selector').value;
             atualizarDadosEmpresa();
+        }
+
+        function limparDadosTela() {
+            document.getElementById('kpi-saldo').textContent = 'R$ 0,00';
+            document.getElementById('kpi-receber').textContent = 'R$ 0,00';
+            document.getElementById('kpi-pagar').textContent = 'R$ 0,00';
+            document.getElementById('kpi-projetado').textContent = 'R$ 0,00';
+            document.getElementById('tabela-agenda').innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-gray-400">Selecione uma empresa para iniciar.</td></tr>';
         }
 
         async function atualizarDadosEmpresa() {
@@ -605,6 +608,7 @@
         }
 
         async function carregarLancamentos() {
+            if (!empresaAtualId) return;
             const tipo = document.getElementById('filtro-tipo').value;
             const status = document.getElementById('filtro-status').value;
             let query = supabaseClient.from('lancamentos_financeiros').select('*').eq('empresa_id', empresaAtualId);
@@ -640,6 +644,7 @@
         }
 
         async function carregarCRM() {
+            if (!empresaAtualId) return;
             const { data } = await supabaseClient.from('parceiros_crm').select('*').eq('empresa_id', empresaAtualId);
             const tbody = document.getElementById('tabela-crm');
             tbody.innerHTML = '';
@@ -649,6 +654,7 @@
         }
 
         async function carregarLogsBot() {
+            if (!empresaAtualId) return;
             const { data } = await supabaseClient.from('bot_logs_lancamentos').select('*').eq('empresa_id', empresaAtualId).order('created_at', { ascending: false });
             const tbody = document.getElementById('tabela-botlogs');
             tbody.innerHTML = (data && data.length) ? '' : '<tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">Nenhuma mensagem registrada pelo bot ainda.</td></tr>';
@@ -665,21 +671,29 @@
             });
         }
 
-        // Submits
+        // Submits e Salvamento de Empresa com seleção automática imediata
         document.getElementById('form-empresa').addEventListener('submit', async (e) => {
             e.preventDefault();
-            await supabaseClient.from('empresas').insert({
+            const { data, error } = await supabaseClient.from('empresas').insert({
                 nome_fantasia: document.getElementById('emp-fantasia').value,
                 razao_social: document.getElementById('emp-razao').value,
                 cnpj: document.getElementById('emp-cnpj').value,
                 whatsapp_autorizado: document.getElementById('emp-whatsapp').value.replace(/\D/g, '')
-            });
+            }).select();
+
             fecharModais(); 
-            carregarEmpresas();
+
+            if (data && data.length > 0) {
+                // Seleciona automaticamente a empresa recém-criada e carrega seus dados no sistema
+                await carregarEmpresas(data[0].id);
+            } else {
+                await carregarEmpresas();
+            }
         });
 
         document.getElementById('form-lancamento').addEventListener('submit', async (e) => {
             e.preventDefault();
+            if (!empresaAtualId) { alert('Selecione uma empresa primeiro.'); return; }
             await supabaseClient.from('lancamentos_financeiros').insert({
                 empresa_id: empresaAtualId,
                 tipo: document.getElementById('lanc-tipo').value,
@@ -693,6 +707,7 @@
 
         document.getElementById('form-parceiro').addEventListener('submit', async (e) => {
             e.preventDefault();
+            if (!empresaAtualId) { alert('Selecione uma empresa primeiro.'); return; }
             await supabaseClient.from('parceiros_crm').insert({
                 empresa_id: empresaAtualId,
                 nome_razao: document.getElementById('parc-nome').value,
@@ -721,9 +736,9 @@
         function abrirModalParceiro() { document.getElementById('modal-parceiro').classList.remove('hidden'); }
         
         function abrirModalLancamento(tipo) {
+            if (!empresaAtualId) { alert('Selecione uma empresa cliente primeiro no topo do sistema.'); return; }
             document.getElementById('lanc-tipo').value = tipo;
             document.getElementById('titulo-modal-lancamento').textContent = tipo === 'receber' ? 'Nova Conta a Receber' : 'Nova Conta a Pagar';
-            document.getElementById('modal-lancamento').classList.add('hidden'); // Ajustado para não fechar errado
             document.getElementById('modal-lancamento').classList.remove('hidden');
         }
 
