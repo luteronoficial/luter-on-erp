@@ -67,7 +67,7 @@
                 <!-- SELETOR DE EMPRESA E BOTÃO DISCRETO -->
                 <div class="flex-1 max-w-md flex items-center gap-2">
                     <select id="empresa-selector" onchange="trocarEmpresa()" class="w-full bg-luter-greenDark text-white text-xs sm:text-sm border border-luter-gold/50 rounded-lg px-3 py-2 focus:outline-none">
-                        <option value="">Selecione uma empresa...</option>
+                        <option value="">Carregando empresas...</option>
                     </select>
                     <button onclick="abrirModalEmpresa()" class="bg-luter-gold hover:bg-luter-goldLight text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap shadow-sm">+ Empresa</button>
                 </div>
@@ -255,7 +255,7 @@
                         <input type="text" id="emp-cnpj" required placeholder="00.000.000/0001-00" oninput="mascaraCNPJ(this)" class="w-full border rounded-lg px-3 py-2 font-mono">
                         <button type="button" onclick="consultarCNPJ()" class="bg-luter-gold text-white px-3 py-2 rounded-lg font-semibold whitespace-nowrap hover:bg-luter-goldLight">🔍 Buscar</button>
                     </div>
-                    <p id="cnpj-status" class="text-[10px] text-gray-500 mt-1">Digite os 14 números para buscar automaticamente.</p>
+                    <p id="cnpj-status" class="text-[10px] text-gray-500 mt-1">Digite os 14 números para validar e buscar automaticamente.</p>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -292,7 +292,7 @@
 
                 <div class="flex justify-end gap-2 pt-3 border-t">
                     <button type="button" onclick="fecharModais()" class="px-4 py-2 border rounded-lg">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-luter-green text-white rounded-lg font-semibold">Salvar Empresa</button>
+                    <button type="submit" id="btn-salvar-empresa" class="px-4 py-2 bg-luter-green text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed">Salvar Empresa</button>
                 </div>
             </form>
         </div>
@@ -333,6 +333,7 @@
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let empresaAtualId = null;
+        let empresasCadastradas = [];
         let filtroAgendaAtual = 'hoje';
 
         const formatarMoeda = (val) => Number(val || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -342,7 +343,22 @@
             if (session) iniciarSistema(session.user);
         });
 
-        // Máscara automática de CNPJ fluida
+        // Verifica se o CNPJ já existe na base (comparando apenas dígitos)
+        async function verificarCNPJDuplicado(cnpjLimpo) {
+            // Verifica primeiro na lista em memória
+            let encontrada = empresasCadastradas.find(e => (e.cnpj || '').replace(/\D/g, '') === cnpjLimpo);
+            if (encontrada) return encontrada;
+
+            // Consulta direta no Supabase para garantir integridade
+            const { data } = await supabaseClient.from('empresas').select('id, nome_fantasia, cnpj');
+            if (data && data.length > 0) {
+                empresasCadastradas = data;
+                encontrada = data.find(e => (e.cnpj || '').replace(/\D/g, '') === cnpjLimpo);
+            }
+            return encontrada || null;
+        }
+
+        // Máscara automática de CNPJ fluida com validação de duplicidade
         function mascaraCNPJ(input) {
             let v = input.value.replace(/\D/g, '');
             if (v.length > 14) v = v.substring(0, 14);
@@ -359,16 +375,20 @@
 
             input.value = v;
 
+            const btnSalvar = document.getElementById('btn-salvar-empresa');
+            btnSalvar.disabled = false;
+
             let apenasNumeros = v.replace(/\D/g, '');
             if (apenasNumeros.length === 14) {
                 consultarCNPJ();
             }
         }
 
-        // Sistema de Busca com Tratamento de Erros por CNPJ Indisponível nas Bases Públicas
+        // Sistema de Busca com Validação Anti-Duplicidade
         async function consultarCNPJ() {
             let cnpjInput = document.getElementById('emp-cnpj').value.replace(/\D/g, '');
             const statusEl = document.getElementById('cnpj-status');
+            const btnSalvar = document.getElementById('btn-salvar-empresa');
 
             if (cnpjInput.length !== 14) {
                 statusEl.textContent = '⚠️ Digite os 14 números do CNPJ.';
@@ -376,6 +396,16 @@
                 return;
             }
 
+            // 1. Validação imediata de duplicidade
+            const duplicada = await verificarCNPJDuplicado(cnpjInput);
+            if (duplicada) {
+                statusEl.textContent = `🚫 CNPJ já cadastrado para a empresa "${duplicada.nome_fantasia}". Cadastros duplicados não são permitidos.`;
+                statusEl.className = 'text-[11px] text-red-600 mt-1 font-bold';
+                btnSalvar.disabled = true;
+                return;
+            }
+
+            btnSalvar.disabled = false;
             statusEl.textContent = 'Consultando Receita Federal...';
             statusEl.className = 'text-[10px] text-amber-600 mt-1 font-bold';
 
@@ -453,7 +483,7 @@
                 statusEl.textContent = '✅ Dados carregados com sucesso!';
                 statusEl.className = 'text-[10px] text-emerald-600 mt-1 font-bold';
             } else {
-                statusEl.textContent = 'ℹ️ CNPJ não localizado automaticamente. Preencha os campos abaixo.';
+                statusEl.textContent = 'ℹ️ CNPJ válido e disponível. Preencha os campos abaixo.';
                 statusEl.className = 'text-[10px] text-amber-600 mt-1 font-bold';
                 document.getElementById('emp-fantasia').focus();
             }
@@ -498,23 +528,23 @@
             const { data: empresas, error } = await supabaseClient.from('empresas').select('*').order('nome_fantasia');
             const selector = document.getElementById('empresa-selector');
             selector.innerHTML = '';
+            empresasCadastradas = empresas || [];
             
-            if (error || !empresas || empresas.length === 0) {
+            if (error || empresasCadastradas.length === 0) {
                 selector.innerHTML = '<option value="">Nenhuma empresa cadastrada</option>';
                 empresaAtualId = null;
                 limparDadosTela();
                 return;
             }
 
-            empresas.forEach(emp => {
+            empresasCadastradas.forEach(emp => {
                 selector.innerHTML += `<option value="${emp.id}">${emp.nome_fantasia} (${emp.cnpj})</option>`;
             });
 
-            // Se foi passado um ID recente (pós-cadastro), seleciona ele. Senão, mantém o atual ou o primeiro.
-            if (selecionarRecenteId && empresas.some(e => e.id === selecionarRecenteId)) {
+            if (selecionarRecenteId && empresasCadastradas.some(e => e.id === selecionarRecenteId)) {
                 empresaAtualId = selecionarRecenteId;
-            } else if (!empresaAtualId || !empresas.some(e => e.id === empresaAtualId)) {
-                empresaAtualId = empresas[0].id;
+            } else if (!empresaAtualId || !empresasCadastradas.some(e => e.id === empresaAtualId)) {
+                empresaAtualId = empresasCadastradas[0].id;
             }
 
             selector.value = empresaAtualId;
@@ -531,7 +561,7 @@
             document.getElementById('kpi-receber').textContent = 'R$ 0,00';
             document.getElementById('kpi-pagar').textContent = 'R$ 0,00';
             document.getElementById('kpi-projetado').textContent = 'R$ 0,00';
-            document.getElementById('tabela-agenda').innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-gray-400">Selecione uma empresa para iniciar.</td></tr>';
+            document.getElementById('tabela-agenda').innerHTML = '<tr><td colspan="5" class="px-4 py-6 text-center text-gray-400">Cadastre ou selecione uma empresa no topo para iniciar.</td></tr>';
         }
 
         async function atualizarDadosEmpresa() {
@@ -540,6 +570,7 @@
         }
 
         async function carregarDashboardEAgenda() {
+            if (!empresaAtualId) return;
             const { data: contas } = await supabaseClient.from('contas_correntes').select('*').eq('empresa_id', empresaAtualId);
             const { data: lancamentos } = await supabaseClient.from('lancamentos_financeiros').select('*').eq('empresa_id', empresaAtualId);
 
@@ -671,23 +702,55 @@
             });
         }
 
-        // Submits e Salvamento de Empresa com seleção automática imediata
+        // Submits e Salvamento de Empresa com Bloqueio Rigoroso contra CNPJ Duplicado
         document.getElementById('form-empresa').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const { data, error } = await supabaseClient.from('empresas').insert({
-                nome_fantasia: document.getElementById('emp-fantasia').value,
-                razao_social: document.getElementById('emp-razao').value,
-                cnpj: document.getElementById('emp-cnpj').value,
-                whatsapp_autorizado: document.getElementById('emp-whatsapp').value.replace(/\D/g, '')
-            }).select();
+            const btnSalvar = document.getElementById('btn-salvar-empresa');
+            const statusEl = document.getElementById('cnpj-status');
+            const cnpjLimpo = document.getElementById('emp-cnpj').value.replace(/\D/g, '');
 
-            fecharModais(); 
+            if (cnpjLimpo.length !== 14) {
+                alert('Informe um CNPJ válido com 14 dígitos.');
+                return;
+            }
 
-            if (data && data.length > 0) {
-                // Seleciona automaticamente a empresa recém-criada e carrega seus dados no sistema
-                await carregarEmpresas(data[0].id);
-            } else {
-                await carregarEmpresas();
+            btnSalvar.textContent = 'Validando...';
+            btnSalvar.disabled = true;
+
+            try {
+                // Validação final antes de gravar no banco
+                const duplicada = await verificarCNPJDuplicado(cnpjLimpo);
+                if (duplicada) {
+                    statusEl.textContent = `🚫 CNPJ já cadastrado para "${duplicada.nome_fantasia}".`;
+                    statusEl.className = 'text-[11px] text-red-600 mt-1 font-bold';
+                    alert(`Este CNPJ (${document.getElementById('emp-cnpj').value}) já está cadastrado para a empresa "${duplicada.nome_fantasia}". Não é permitido cadastro duplicado.`);
+                    return;
+                }
+
+                btnSalvar.textContent = 'Salvando...';
+
+                const { data, error } = await supabaseClient.from('empresas').insert({
+                    nome_fantasia: document.getElementById('emp-fantasia').value.trim(),
+                    razao_social: document.getElementById('emp-razao').value.trim(),
+                    cnpj: document.getElementById('emp-cnpj').value.trim(),
+                    whatsapp_autorizado: document.getElementById('emp-whatsapp').value.replace(/\D/g, '')
+                }).select();
+
+                if (error) throw error;
+
+                fecharModais();
+
+                if (data && data.length > 0) {
+                    await carregarEmpresas(data[0].id);
+                    alert('✅ Empresa cadastrada e selecionada com sucesso!');
+                } else {
+                    await carregarEmpresas();
+                }
+            } catch (err) {
+                alert('Erro ao salvar empresa: ' + (err.message || err));
+            } finally {
+                btnSalvar.textContent = 'Salvar Empresa';
+                btnSalvar.disabled = false;
             }
         });
 
@@ -728,7 +791,8 @@
 
         function abrirModalEmpresa() { 
             document.getElementById('form-empresa').reset();
-            document.getElementById('cnpj-status').textContent = 'Digite os 14 números para buscar automaticamente.';
+            document.getElementById('btn-salvar-empresa').disabled = false;
+            document.getElementById('cnpj-status').textContent = 'Digite os 14 números para validar e buscar automaticamente.';
             document.getElementById('cnpj-status').className = 'text-[10px] text-gray-500 mt-1';
             document.getElementById('modal-empresa').classList.remove('hidden'); 
         }
