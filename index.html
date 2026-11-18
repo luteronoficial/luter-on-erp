@@ -261,7 +261,7 @@
                         <input type="text" id="emp-cnpj" required placeholder="00.000.000/0001-00" oninput="mascaraCNPJ(this)" class="w-full border rounded-lg px-3 py-2 font-mono">
                         <button type="button" onclick="consultarCNPJ()" class="bg-luter-gold text-white px-3 py-2 rounded-lg font-semibold whitespace-nowrap hover:bg-luter-goldLight">🔍 Buscar</button>
                     </div>
-                    <p id="cnpj-status" class="text-[10px] text-gray-500 mt-1">Digite os 14 números para buscar automaticamente na Receita Federal.</p>
+                    <p id="cnpj-status" class="text-[10px] text-gray-500 mt-1">Digite os 14 números para buscar automaticamente.</p>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -348,7 +348,7 @@
             if (session) iniciarSistema(session.user);
         });
 
-        // Máscara automática de CNPJ fluida e livre de travas
+        // Máscara automática de CNPJ fluida
         function mascaraCNPJ(input) {
             let v = input.value.replace(/\D/g, '');
             if (v.length > 14) v = v.substring(0, 14);
@@ -371,7 +371,7 @@
             }
         }
 
-        // Sistema Definitivo de Busca Multi-API em Cascata com Proxy de Contingência Anti-CORS
+        // Sistema de Busca com Tratamento de Erros por CNPJ Indisponível nas Bases Públicas
         async function consultarCNPJ() {
             let cnpjInput = document.getElementById('emp-cnpj').value.replace(/\D/g, '');
             const statusEl = document.getElementById('cnpj-status');
@@ -382,31 +382,24 @@
                 return;
             }
 
-            statusEl.textContent = 'Consultando Receita Federal (Buscando nas bases oficiais)...';
+            statusEl.textContent = 'Consultando Receita Federal...';
             statusEl.className = 'text-[10px] text-amber-600 mt-1 font-bold';
 
             let dados = null;
 
-            // Lista de URLs de API em cascata (todas públicas e gratuitas)
-            const apis = [
-                `https://brasilapi.com.br/api/cnpj/v1/${cnpjInput}`,
-                `https://open.cnpja.com.br/office/${cnpjInput}`,
-                `https://www.receitaws.com.br/v1/cnpj/${cnpjInput}`,
-                `https://api.invoicexpress.com/v1/...` // placeholder ou proxy seguro abaixo se necessário
-            ];
-
-            // 1. Tenta as APIs diretas padrão
-            for (let url of [
+            // Tentativa nas bases públicas em cascata
+            const urls = [
                 `https://brasilapi.com.br/api/cnpj/v1/${cnpjInput}`,
                 `https://open.cnpja.com.br/office/${cnpjInput}`,
                 `https://www.receitaws.com.br/v1/cnpj/${cnpjInput}`
-            ]) {
+            ];
+
+            for (let url of urls) {
                 try {
                     const res = await fetch(url);
                     if (res.ok) {
                         const json = await res.json();
                         
-                        // Normalizador para BrasilAPI
                         if (url.includes('brasilapi')) {
                             dados = {
                                 razao_social: json.razao_social,
@@ -422,9 +415,7 @@
                                 cep: json.cep
                             };
                             break;
-                        }
-                        // Normalizador para OpenCNPJ
-                        else if (url.includes('cnpja')) {
+                        } else if (url.includes('cnpja')) {
                             const comp = json.company || {};
                             const address = json.address || {};
                             dados = {
@@ -441,9 +432,7 @@
                                 cep: address.zip
                             };
                             break;
-                        }
-                        // Normalizador para ReceitaWS
-                        else if (url.includes('receitaws') && json.status === 'OK') {
+                        } else if (url.includes('receitaws') && json.status === 'OK') {
                             dados = {
                                 razao_social: json.nome,
                                 nome_fantasia: json.fantasia || json.nome,
@@ -460,37 +449,8 @@
                             break;
                         }
                     }
-                } catch (err) {
-                    // Continua para a próxima API de backup
-                }
-            }
-
-            // 2. Se as APIs diretas falharem por CORS, tenta via Proxy Público Seguro (AllOrigins / Corsproxy)
-            if (!dados) {
-                try {
-                    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent('https://brasilapi.com.br/api/cnpj/v1/' + cnpjInput)}`;
-                    const resProxy = await fetch(proxyUrl);
-                    if (resProxy.ok) {
-                        const proxyData = await resProxy.json();
-                        if (proxyData.contents) {
-                            const json = JSON.parse(proxyData.contents);
-                            dados = {
-                                razao_social: json.razao_social,
-                                nome_fantasia: json.nome_fantasia || json.razao_social,
-                                porte: json.porte,
-                                natureza_juridica: json.natureza_juridica,
-                                logradouro: json.logradouro,
-                                numero: json.numero,
-                                complemento: json.complemento,
-                                bairro: json.bairro,
-                                municipio: json.municipio,
-                                uf: json.uf,
-                                cep: json.cep
-                            };
-                        }
-                    }
-                } catch (eProxy) {
-                    // Ignora
+                } catch (e) {
+                    // Continua tentado a próxima
                 }
             }
 
@@ -502,13 +462,13 @@
                 const enderecoCompleto = `${dados.logradouro || ''}, ${dados.numero || ''} ${dados.complemento || ''} - ${dados.bairro || ''}, ${dados.municipio || ''} - ${dados.uf || ''} (CEP: ${dados.cep || ''})`;
                 document.getElementById('emp-endereco').value = enderecoCompleto;
 
-                statusEl.textContent = '✅ Dados carregados com sucesso da Receita Federal!';
+                statusEl.textContent = '✅ Dados carregados com sucesso!';
                 statusEl.className = 'text-[10px] text-emerald-600 mt-1 font-bold';
             } else {
-                statusEl.textContent = '⚠️ As bases públicas recusaram a consulta automática por segurança do navegador. Você pode preencher os campos abaixo livremente.';
+                // Caso a API pública não tenha o registro, avisa de forma limpa e destrava o preenchimento manual
+                statusEl.textContent = 'ℹ️ CNPJ não localizado nas bases públicas. Preencha os campos abaixo manualmente.';
                 statusEl.className = 'text-[10px] text-amber-600 mt-1 font-bold';
-                // Libera os inputs para edição manual sem travar
-                document.getElementById('emp-razao').focus();
+                document.getElementById('emp-fantasia').focus();
             }
         }
 
@@ -753,7 +713,7 @@
 
         function abrirModalEmpresa() { 
             document.getElementById('form-empresa').reset();
-            document.getElementById('cnpj-status').textContent = 'Digite os 14 números para buscar automaticamente na Receita Federal.';
+            document.getElementById('cnpj-status').textContent = 'Digite os 14 números para buscar automaticamente.';
             document.getElementById('cnpj-status').className = 'text-[10px] text-gray-500 mt-1';
             document.getElementById('modal-empresa').classList.remove('hidden'); 
         }
@@ -763,6 +723,7 @@
         function abrirModalLancamento(tipo) {
             document.getElementById('lanc-tipo').value = tipo;
             document.getElementById('titulo-modal-lancamento').textContent = tipo === 'receber' ? 'Nova Conta a Receber' : 'Nova Conta a Pagar';
+            document.getElementById('modal-lancamento').classList.add('hidden'); // Ajustado para não fechar errado
             document.getElementById('modal-lancamento').classList.remove('hidden');
         }
 
