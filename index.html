@@ -119,7 +119,7 @@
                     </div>
                 </div>
 
-                <!-- AGENDA DE VENCIMENTOS (SEPARADO POR DIA, SEMANA, MÊS) -->
+                <!-- AGENDA DE VENCIMENTOS -->
                 <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-4">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b pb-3">
                         <div>
@@ -232,7 +232,7 @@
                 </div>
             </section>
 
-            <!-- ABA 5: GESTÃO DE OPERADORES (EQUIPE) -->
+            <!-- ABA 5: GESTÃO DE OPERADORES -->
             <section id="view-equipe" class="hidden space-y-4">
                 <div class="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-200">
                     <div>
@@ -247,36 +247,65 @@
         </main>
     </div>
 
-    <!-- MODAIS -->
+    <!-- MODAIS COM BUSCA AUTOMÁTICA DE CNPJ -->
     <div id="modal-empresa" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
-            <h3 class="text-base font-bold text-luter-green">Nova Empresa Cliente</h3>
+        <div class="bg-white rounded-xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b pb-2">
+                <h3 class="text-base font-bold text-luter-green">Cadastrar Nova Empresa Cliente</h3>
+                <button onclick="fecharModais()" class="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+            </div>
+            
             <form id="form-empresa" class="space-y-3 text-xs">
                 <div>
-                    <label class="block font-semibold mb-1">Nome Fantasia *</label>
-                    <input type="text" id="emp-fantasia" required placeholder="Ex: Loja do João" class="w-full border rounded-lg px-3 py-2">
+                    <label class="block font-semibold mb-1">CNPJ * (Digite para puxar da Receita Federal)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="emp-cnpj" required placeholder="00.000.000/0001-00" onblur="consultarCNPJ()" class="w-full border rounded-lg px-3 py-2 font-mono">
+                        <button type="button" onclick="consultarCNPJ()" class="bg-luter-gold text-white px-3 py-2 rounded-lg font-semibold whitespace-nowrap hover:bg-luter-goldLight">🔍 Consultar</button>
+                    </div>
+                    <p id="cnpj-status" class="text-[10px] text-gray-500 mt-1">Ao sair do campo, os dados serão preenchidos automaticamente.</p>
                 </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold mb-1">Nome Fantasia</label>
+                        <input type="text" id="emp-fantasia" required class="w-full border rounded-lg px-3 py-2 bg-gray-50">
+                    </div>
+                    <div>
+                        <label class="block font-semibold mb-1">Tipo de Empresa (Natureza Jurídica)</label>
+                        <input type="text" id="emp-tipo" placeholder="MEI, ME, LTDA, S.A..." class="w-full border rounded-lg px-3 py-2 bg-gray-50">
+                    </div>
+                </div>
+
                 <div>
                     <label class="block font-semibold mb-1">Razão Social *</label>
-                    <input type="text" id="emp-razao" required placeholder="João Comércio ME" class="w-full border rounded-lg px-3 py-2">
+                    <input type="text" id="emp-razao" required class="w-full border rounded-lg px-3 py-2 bg-gray-50">
                 </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block font-semibold mb-1">Inscrição Estadual (IE)</label>
+                        <input type="text" id="emp-ie" placeholder="Isento / Número" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block font-semibold mb-1">WhatsApp Autorizado do Bot *</label>
+                        <input type="text" id="emp-whatsapp" required placeholder="5511999999999" class="w-full border rounded-lg px-3 py-2">
+                    </div>
+                </div>
+
                 <div>
-                    <label class="block font-semibold mb-1">CNPJ *</label>
-                    <input type="text" id="emp-cnpj" required placeholder="00.000.000/0001-00" class="w-full border rounded-lg px-3 py-2">
+                    <label class="block font-semibold mb-1">Endereço Completo</label>
+                    <input type="text" id="emp-endereco" placeholder="Rua, Número, Bairro, Cidade - UF, CEP" class="w-full border rounded-lg px-3 py-2 bg-gray-50">
                 </div>
-                <div>
-                    <label class="block font-semibold mb-1">WhatsApp Autorizado do Bot *</label>
-                    <input type="text" id="emp-whatsapp" required placeholder="5511999999999 (DDI + DDD + Número)" class="w-full border rounded-lg px-3 py-2">
-                    <p class="text-[10px] text-gray-500 mt-0.5">Número que enviará os gastos e ganhos via WhatsApp.</p>
-                </div>
-                <div class="flex justify-end gap-2 pt-2">
+
+                <div class="flex justify-end gap-2 pt-3 border-t">
                     <button type="button" onclick="fecharModais()" class="px-4 py-2 border rounded-lg">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-luter-green text-white rounded-lg font-semibold">Salvar</button>
+                    <button type="submit" class="px-4 py-2 bg-luter-green text-white rounded-lg font-semibold">Salvar Empresa</button>
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- Modal Lançamento -->
     <div id="modal-lancamento" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
             <h3 id="titulo-modal-lancamento" class="text-base font-bold text-luter-green">Lançamento</h3>
@@ -293,6 +322,7 @@
         </div>
     </div>
 
+    <!-- Modal Parceiro CRM -->
     <div id="modal-parceiro" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
             <h3 class="text-base font-bold text-luter-green">Novo Parceiro</h3>
@@ -319,9 +349,41 @@
             if (session) iniciarSistema(session.user);
         });
 
-        // Evento de Login corrigido para prevenir recarregamento e capturar erros
+        // Consulta Automática de CNPJ via BrasilAPI
+        async function consultarCNPJ() {
+            let cnpjInput = document.getElementById('emp-cnpj').value.replace(/\D/g, '');
+            const statusEl = document.getElementById('cnpj-status');
+
+            if (cnpjInput.length !== 14) {
+                return;
+            }
+
+            statusEl.textContent = 'Consultando Receita Federal...';
+            statusEl.className = 'text-[10px] text-amber-600 mt-1 font-bold';
+
+            try {
+                const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjInput}`);
+                if (!response.ok) throw new Error('CNPJ não encontrado');
+                
+                const data = await response.json();
+
+                document.getElementById('emp-razao').value = data.razao_social || '';
+                document.getElementById('emp-fantasia').value = data.nome_fantasia || data.razao_social || '';
+                document.getElementById('emp-tipo').value = data.porte + ' - ' + (data.natureza_juridica || '');
+                
+                const enderecoCompleto = `${data.logradouro || ''}, ${data.numero || ''} ${data.complemento || ''} - ${data.bairro || ''}, ${data.municipio || ''} - ${data.uf || ''} (CEP: ${data.cep || ''})`;
+                document.getElementById('emp-endereco').value = enderecoCompleto;
+
+                statusEl.textContent = '✅ Dados carregados com sucesso da Receita Federal!';
+                statusEl.className = 'text-[10px] text-emerald-600 mt-1 font-bold';
+            } catch (error) {
+                statusEl.textContent = '⚠️ CNPJ não localizado automaticamente. Preencha os dados manualmente.';
+                statusEl.className = 'text-[10px] text-red-600 mt-1 font-bold';
+            }
+        }
+
         document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault(); // Impede o recarregamento padrão da página
+            e.preventDefault();
             const email = document.getElementById('login-email').value.trim();
             const password = document.getElementById('login-password').value;
             const errorDiv = document.getElementById('login-error');
@@ -337,7 +399,7 @@
                 errorDiv.textContent = 'Erro ao entrar: ' + error.message;
                 errorDiv.classList.remove('hidden');
                 btnEntrar.textContent = 'ACESSAR SISTEMA';
-                btnEntrav.disabled = false;
+                btnEntrar.disabled = false;
             } else if (data.session) {
                 iniciarSistema(data.session.user);
             }
@@ -513,6 +575,7 @@
             });
         }
 
+        // Submits
         document.getElementById('form-empresa').addEventListener('submit', async (e) => {
             e.preventDefault();
             await supabaseClient.from('empresas').insert({
@@ -521,7 +584,8 @@
                 cnpj: document.getElementById('emp-cnpj').value,
                 whatsapp_autorizado: document.getElementById('emp-whatsapp').value.replace(/\D/g, '')
             });
-            fecharModais(); carregarEmpresas();
+            fecharModais(); 
+            carregarEmpresas();
         });
 
         document.getElementById('form-lancamento').addEventListener('submit', async (e) => {
@@ -558,6 +622,7 @@
         }
 
         function abrirModalEmpresa() { document.getElementById('modal-empresa').classList.remove('hidden'); }
+        function abrirManagerParceiro() { document.getElementById('modal-parceiro').classList.remove('hidden'); }
         function abrirModalParceiro() { document.getElementById('modal-parceiro').classList.remove('hidden'); }
         function abrirModalLancamento(tipo) {
             document.getElementById('lanc-tipo').value = tipo;
