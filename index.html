@@ -370,7 +370,6 @@
             }
 
             input.value = v;
-
             document.getElementById('btn-salvar-empresa').disabled = false;
 
             let apenasNumeros = v.replace(/\D/g, '');
@@ -379,7 +378,53 @@
             }
         }
 
-        // Sistema de Consulta Anti-CORS com Proxy Público Seguro
+        // Helper JSONP para ReceitaWS (ignora 100% qualquer bloqueio CORS do navegador)
+        function buscarReceitaWSJsonp(cnpj) {
+            return new Promise((resolve) => {
+                const callbackName = 'jsonp_cnpj_' + Math.round(100000 * Math.random());
+                const script = document.createElement('script');
+                const timeout = setTimeout(() => {
+                    cleanup();
+                    resolve(null);
+                }, 7000);
+
+                function cleanup() {
+                    clearTimeout(timeout);
+                    delete window[callbackName];
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                }
+
+                window[callbackName] = function(data) {
+                    cleanup();
+                    if (data && data.status === 'OK') {
+                        resolve({
+                            razao_social: data.nome,
+                            nome_fantasia: data.fantasia || data.nome,
+                            porte: data.porte || '',
+                            natureza_juridica: data.natureza_juridica || '',
+                            logradouro: data.logradouro || '',
+                            numero: data.numero || '',
+                            complemento: data.complemento || '',
+                            bairro: data.bairro || '',
+                            municipio: data.municipio || '',
+                            uf: data.uf || '',
+                            cep: data.cep || ''
+                        });
+                    } else {
+                        resolve(null);
+                    }
+                };
+
+                script.src = `https://www.receitaws.com.br/v1/cnpj/${cnpj}?callback=${callbackName}`;
+                script.onerror = () => {
+                    cleanup();
+                    resolve(null);
+                };
+                document.body.appendChild(script);
+            });
+        }
+
+        // Busca em Cascata de 4 Camadas: BrasilAPI -> MinhaReceita -> OpenCNPJ -> ReceitaWS (JSONP)
         async function consultarCNPJ() {
             let cnpjInput = document.getElementById('emp-cnpj').value.replace(/\D/g, '');
             const statusEl = document.getElementById('cnpj-status');
@@ -400,74 +445,112 @@
             }
 
             btnSalvar.disabled = false;
-            statusEl.textContent = 'Consultando Receita Federal...';
+            statusEl.textContent = '⏳ Consultando Receita Federal...';
             statusEl.className = 'text-[10px] text-amber-600 mt-1 font-bold';
 
             let dados = null;
 
-            // Tentativa via Proxy Seguro AllOrigins para burlar CORS em qualquer CNPJ
+            // Camada 1: BrasilAPI
             try {
-                const targetUrl = `https://brasilapi.com.br/api/cnpj/v1/${cnpjInput}`;
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-                const res = await fetch(proxyUrl);
-                
+                const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjInput}`);
                 if (res.ok) {
-                    const dataProxy = await res.json();
-                    if (dataProxy.contents) {
-                        const json = JSON.parse(dataProxy.contents);
+                    const json = await res.json();
+                    if (json && json.razao_social) {
+                        dados = {
+                            razao_social: json.razao_social,
+                            nome_fantasia: json.nome_fantasia || json.razao_social,
+                            porte: json.porte || '',
+                            natureza_juridica: json.natureza_juridica || '',
+                            logradouro: json.logradouro || '',
+                            numero: json.numero || '',
+                            complemento: json.complemento || '',
+                            bairro: json.bairro || '',
+                            municipio: json.municipio || '',
+                            uf: json.uf || '',
+                            cep: json.cep || ''
+                        };
+                    }
+                }
+            } catch (e) {}
+
+            // Camada 2: Minha Receita
+            if (!dados) {
+                try {
+                    const res = await fetch(`https://minhareceita.org/${cnpjInput}`);
+                    if (res.ok) {
+                        const json = await res.json();
                         if (json && json.razao_social) {
                             dados = {
                                 razao_social: json.razao_social,
                                 nome_fantasia: json.nome_fantasia || json.razao_social,
-                                porte: json.porte,
-                                natureza_juridica: json.natureza_juridica,
-                                logradouro: json.logradouro,
-                                numero: json.numero,
-                                complemento: json.complemento,
-                                bairro: json.bairro,
-                                municipio: json.municipio,
-                                uf: json.uf,
-                                cep: json.cep
+                                porte: json.porte || '',
+                                natureza_juridica: json.natureza_juridica || '',
+                                logradouro: json.logradouro || '',
+                                numero: json.numero || '',
+                                complemento: json.complemento || '',
+                                bairro: json.bairro || '',
+                                municipio: json.municipio || '',
+                                uf: json.uf || '',
+                                cep: json.cep || ''
                             };
                         }
                     }
-                }
-            } catch (e) {
-                // Se o proxy falhar, tenta API direta de contingência
+                } catch (e) {}
+            }
+
+            // Camada 3: OpenCNPJ
+            if (!dados) {
                 try {
-                    const resDirect = await fetch(`https://open.cnpja.com.br/office/${cnpjInput}`);
-                    if (resDirect.ok) {
-                        const jsonDirect = await resDirect.json();
-                        const comp = jsonDirect.company || {};
-                        const address = jsonDirect.address || {};
-                        dados = {
-                            razao_social: comp.name || jsonDirect.alias,
-                            nome_fantasia: jsonDirect.alias || comp.name,
-                            porte: comp.size?.text || '',
-                            natureza_juridica: comp.natureza?.text || '',
-                            logradouro: address.street,
-                            numero: address.number,
-                            complemento: address.details,
-                            bairro: address.district,
-                            municipio: address.city,
-                            uf: address.state,
-                            cep: address.zip
-                        };
+                    const res = await fetch(`https://open.cnpja.com.br/office/${cnpjInput}`);
+                    if (res.ok) {
+                        const json = await res.json();
+                        const comp = json.company || {};
+                        const address = json.address || {};
+                        if (comp.name || json.alias) {
+                            dados = {
+                                razao_social: comp.name || json.alias,
+                                nome_fantasia: json.alias || comp.name,
+                                porte: comp.size?.text || '',
+                                natureza_juridica: comp.nature?.text || '',
+                                logradouro: address.street || '',
+                                numero: address.number || '',
+                                complemento: address.details || '',
+                                bairro: address.district || '',
+                                municipio: address.city || '',
+                                uf: address.state || '',
+                                cep: address.zip || ''
+                            };
+                        }
                     }
-                } catch (errDirect) {}
+                } catch (e) {}
+            }
+
+            // Camada 4: ReceitaWS via JSONP (burla CORS nativamente)
+            if (!dados) {
+                dados = await buscarReceitaWSJsonp(cnpjInput);
             }
 
             if (dados) {
                 document.getElementById('emp-razao').value = dados.razao_social || '';
                 document.getElementById('emp-fantasia').value = dados.nome_fantasia || dados.razao_social || '';
-                document.getElementById('emp-tipo').value = (dados.porte ? dados.porte + ' - ' : '') + (dados.natureza_juridica || '');
-                const enderecoCompleto = `${dados.logradouro || ''}, ${dados.numero || ''} ${dados.complemento || ''} - ${dados.bairro || ''}, ${dados.municipio || ''} - ${dados.uf || ''} (CEP: ${dados.cep || ''})`;
-                document.getElementById('emp-endereco').value = enderecoCompleto;
+                document.getElementById('emp-tipo').value = [dados.porte, dados.natureza_juridica].filter(Boolean).join(' - ');
+                
+                const ruaNumero = [dados.logradouro, dados.numero].filter(Boolean).join(', ');
+                const cidadeUf = [dados.municipio, dados.uf].filter(Boolean).join(' - ');
+                const partesEndereco = [
+                    ruaNumero,
+                    dados.complemento,
+                    dados.bairro,
+                    cidadeUf,
+                    dados.cep ? `CEP: ${dados.cep}` : ''
+                ].filter(Boolean);
 
-                statusEl.textContent = '✅ Dados carregados com sucesso!';
+                document.getElementById('emp-endereco').value = partesEndereco.join(' - ');
+
+                statusEl.textContent = '✅ Dados carregados com sucesso da Receita Federal!';
                 statusEl.className = 'text-[10px] text-emerald-600 mt-1 font-bold';
             } else {
-                statusEl.textContent = 'ℹ️ CNPJ válido. Preencha os campos abaixo manualmente.';
+                statusEl.textContent = 'ℹ️ CNPJ não encontrado automaticamente. Preencha os campos abaixo manualmente.';
                 statusEl.className = 'text-[10px] text-amber-600 mt-1 font-bold';
                 document.getElementById('emp-fantasia').focus();
             }
