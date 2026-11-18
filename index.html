@@ -343,13 +343,10 @@
             if (session) iniciarSistema(session.user);
         });
 
-        // Verifica se o CNPJ já existe na base (comparando apenas dígitos)
         async function verificarCNPJDuplicado(cnpjLimpo) {
-            // Verifica primeiro na lista em memória
             let encontrada = empresasCadastradas.find(e => (e.cnpj || '').replace(/\D/g, '') === cnpjLimpo);
             if (encontrada) return encontrada;
 
-            // Consulta direta no Supabase para garantir integridade
             const { data } = await supabaseClient.from('empresas').select('id, nome_fantasia, cnpj');
             if (data && data.length > 0) {
                 empresasCadastradas = data;
@@ -358,7 +355,6 @@
             return encontrada || null;
         }
 
-        // Máscara automática de CNPJ fluida com validação de duplicidade
         function mascaraCNPJ(input) {
             let v = input.value.replace(/\D/g, '');
             if (v.length > 14) v = v.substring(0, 14);
@@ -375,8 +371,7 @@
 
             input.value = v;
 
-            const btnSalvar = document.getElementById('btn-salvar-empresa');
-            btnSalvar.disabled = false;
+            document.getElementById('btn-salvar-empresa').disabled = false;
 
             let apenasNumeros = v.replace(/\D/g, '');
             if (apenasNumeros.length === 14) {
@@ -384,7 +379,7 @@
             }
         }
 
-        // Sistema de Busca com Validação Anti-Duplicidade
+        // Sistema de Consulta Anti-CORS com Proxy Público Seguro
         async function consultarCNPJ() {
             let cnpjInput = document.getElementById('emp-cnpj').value.replace(/\D/g, '');
             const statusEl = document.getElementById('cnpj-status');
@@ -396,10 +391,9 @@
                 return;
             }
 
-            // 1. Validação imediata de duplicidade
             const duplicada = await verificarCNPJDuplicado(cnpjInput);
             if (duplicada) {
-                statusEl.textContent = `🚫 CNPJ já cadastrado para a empresa "${duplicada.nome_fantasia}". Cadastros duplicados não são permitidos.`;
+                statusEl.textContent = `🚫 CNPJ já cadastrado para "${duplicada.nome_fantasia}".`;
                 statusEl.className = 'text-[11px] text-red-600 mt-1 font-bold';
                 btnSalvar.disabled = true;
                 return;
@@ -410,18 +404,18 @@
             statusEl.className = 'text-[10px] text-amber-600 mt-1 font-bold';
 
             let dados = null;
-            const urls = [
-                `https://brasilapi.com.br/api/cnpj/v1/${cnpjInput}`,
-                `https://open.cnpja.com.br/office/${cnpjInput}`,
-                `https://www.receitaws.com.br/v1/cnpj/${cnpjInput}`
-            ];
 
-            for (let url of urls) {
-                try {
-                    const res = await fetch(url);
-                    if (res.ok) {
-                        const json = await res.json();
-                        if (url.includes('brasilapi')) {
+            // Tentativa via Proxy Seguro AllOrigins para burlar CORS em qualquer CNPJ
+            try {
+                const targetUrl = `https://brasilapi.com.br/api/cnpj/v1/${cnpjInput}`;
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+                const res = await fetch(proxyUrl);
+                
+                if (res.ok) {
+                    const dataProxy = await res.json();
+                    if (dataProxy.contents) {
+                        const json = JSON.parse(dataProxy.contents);
+                        if (json && json.razao_social) {
                             dados = {
                                 razao_social: json.razao_social,
                                 nome_fantasia: json.nome_fantasia || json.razao_social,
@@ -435,42 +429,32 @@
                                 uf: json.uf,
                                 cep: json.cep
                             };
-                            break;
-                        } else if (url.includes('cnpja')) {
-                            const comp = json.company || {};
-                            const address = json.address || {};
-                            dados = {
-                                razao_social: comp.name || json.alias,
-                                nome_fantasia: json.alias || comp.name,
-                                porte: comp.size?.text || '',
-                                natureza_juridica: comp.natureza?.text || '',
-                                logradouro: address.street,
-                                numero: address.number,
-                                complemento: address.details,
-                                bairro: address.district,
-                                municipio: address.city,
-                                uf: address.state,
-                                cep: address.zip
-                            };
-                            break;
-                        } else if (url.includes('receitaws') && json.status === 'OK') {
-                            dados = {
-                                razao_social: json.nome,
-                                nome_fantasia: json.fantasia || json.nome,
-                                porte: json.porte,
-                                natureza_juridica: json.natureza_juridica,
-                                logradouro: json.logradouro,
-                                numero: json.numero,
-                                complemento: json.complemento,
-                                bairro: json.bairro,
-                                municipio: json.municipio,
-                                uf: json.uf,
-                                cep: json.cep
-                            };
-                            break;
                         }
                     }
-                } catch (e) {}
+                }
+            } catch (e) {
+                // Se o proxy falhar, tenta API direta de contingência
+                try {
+                    const resDirect = await fetch(`https://open.cnpja.com.br/office/${cnpjInput}`);
+                    if (resDirect.ok) {
+                        const jsonDirect = await resDirect.json();
+                        const comp = jsonDirect.company || {};
+                        const address = jsonDirect.address || {};
+                        dados = {
+                            razao_social: comp.name || jsonDirect.alias,
+                            nome_fantasia: jsonDirect.alias || comp.name,
+                            porte: comp.size?.text || '',
+                            natureza_juridica: comp.natureza?.text || '',
+                            logradouro: address.street,
+                            numero: address.number,
+                            complemento: address.details,
+                            bairro: address.district,
+                            municipio: address.city,
+                            uf: address.state,
+                            cep: address.zip
+                        };
+                    }
+                } catch (errDirect) {}
             }
 
             if (dados) {
@@ -483,7 +467,7 @@
                 statusEl.textContent = '✅ Dados carregados com sucesso!';
                 statusEl.className = 'text-[10px] text-emerald-600 mt-1 font-bold';
             } else {
-                statusEl.textContent = 'ℹ️ CNPJ válido e disponível. Preencha os campos abaixo.';
+                statusEl.textContent = 'ℹ️ CNPJ válido. Preencha os campos abaixo manualmente.';
                 statusEl.className = 'text-[10px] text-amber-600 mt-1 font-bold';
                 document.getElementById('emp-fantasia').focus();
             }
@@ -702,7 +686,6 @@
             });
         }
 
-        // Submits e Salvamento de Empresa com Bloqueio Rigoroso contra CNPJ Duplicado
         document.getElementById('form-empresa').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btnSalvar = document.getElementById('btn-salvar-empresa');
@@ -718,12 +701,13 @@
             btnSalvar.disabled = true;
 
             try {
-                // Validação final antes de gravar no banco
                 const duplicada = await verificarCNPJDuplicado(cnpjLimpo);
                 if (duplicada) {
                     statusEl.textContent = `🚫 CNPJ já cadastrado para "${duplicada.nome_fantasia}".`;
                     statusEl.className = 'text-[11px] text-red-600 mt-1 font-bold';
-                    alert(`Este CNPJ (${document.getElementById('emp-cnpj').value}) já está cadastrado para a empresa "${duplicada.nome_fantasia}". Não é permitido cadastro duplicado.`);
+                    alert(`Este CNPJ já está cadastrado para a empresa "${duplicada.nome_fantasia}". Não é permitido cadastro duplicado.`);
+                    btnSalvar.textContent = 'Salvar Empresa';
+                    btnSalvar.disabled = false;
                     return;
                 }
 
